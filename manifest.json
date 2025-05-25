@@ -1,0 +1,10 @@
+{
+  "domain": "mlt_inverter",
+  "name": "MLT Inverter",
+  "codeowners": ["@cstranex"],
+  "documentation": "https://www.home-assistant.io/integrations/mlt_inverter",
+  "iot_class": "local_polling",
+  "requirements": ["httpx==0.28.1"],
+  "config_flow": true,
+  "version": "1.0.0"
+}
