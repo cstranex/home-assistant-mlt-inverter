@@ -5,70 +5,46 @@ from __future__ import annotations
 import datetime
 import logging
 
-import voluptuous as vol
-
-from homeassistant.config_entries import ConfigEntry, ConfigEntryNotReady
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
-import homeassistant.helpers.config_validation as cv
-from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import CONF_HOST, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
 
-_PLATFORMS: list[Platform] = ["sensor"]
+_PLATFORMS: list[Platform] = [Platform.SENSOR]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-CONFIG_SCHEMA = vol.Schema(
-    {
-        DOMAIN: vol.Schema(
-            {
-                vol.Required(CONF_HOST): cv.string,
-                vol.Optional(
-                    CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL
-                ): cv.positive_int,
-            }
-        )
-    },
-    extra=vol.ALLOW_EXTRA,
-)
-
-
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry):
-    """Set up Your System from a config entry."""
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Set up MLT Inverter from a config entry."""
     host = entry.data[CONF_HOST]
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
 
     coordinator = InverterCoordinator(hass, host, scan_interval)
-    await coordinator.async_refresh()
+    await coordinator.async_config_entry_first_refresh()
 
-    if not coordinator.last_update_success:
-        raise ConfigEntryNotReady
+    hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
 
-    hass.data.setdefault(DOMAIN, {})["coordinator"] = coordinator
-
-    hass.async_create_task(
-        hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
-    )
+    await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
     return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry):
+async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
-    unload_ok = await hass.config_entries.async_forward_entry_unload(entry, _PLATFORMS)
+    unload_ok = await hass.config_entries.async_unload_platforms(entry, _PLATFORMS)
     if unload_ok:
-        hass.data[DOMAIN].pop("coordinator", None)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
     return unload_ok
 
 
 class InverterCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass, host, scan_interval):
+    def __init__(self, hass: HomeAssistant, host: str, scan_interval: int) -> None:
         """Initialize."""
         self.host = host
-        self.hass = hass
         super().__init__(
             hass,
             _LOGGER,
@@ -78,14 +54,11 @@ class InverterCoordinator(DataUpdateCoordinator):
 
     async def _async_update_data(self):
         """Fetch data from API endpoint."""
-        return await self._fetch_data()
-
-    async def _fetch_data(self):
-        """Fetch data from the API."""
         url = f"http://{self.host}:81/testdata"
-
-        client = get_async_client(self.hass)
-        response = await client.post(url, data="dat", timeout=30)
-        response.raise_for_status()
-
-        return response.json()
+        try:
+            client = get_async_client(self.hass)
+            response = await client.post(url, data="dat", timeout=30)
+            response.raise_for_status()
+            return response.json()
+        except Exception as err:
+            raise UpdateFailed(f"Error fetching inverter data: {err}") from err
