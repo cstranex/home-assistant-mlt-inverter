@@ -1,5 +1,134 @@
 from homeassistant.components.sensor import SensorDeviceClass
 
+# Writable settings fetched via POST /testdata with body "set".
+# type "select": Yes/No boolean, written as 0/1.
+# type "number": numeric value, written as int(round(value * 10**decimals)).
+SETTINGS = {
+    # Grid export controls
+    69:  {
+        "name": "enable_grid_export",
+        "description": "Grid Export Enable",
+        "type": "select",
+        "hint": "Allow the inverter to export excess power back to the grid.",
+    },
+    70:  {
+        "name": "export_limit_power",
+        "description": "Grid Export Power Limit",
+        "type": "number",
+        "unit": "kW",
+        "hint": "Maximum power the inverter is allowed to export to the grid.",
+    },
+    72:  {
+        "name": "grid_export_delay",
+        "description": "Grid Export Delay",
+        "type": "number",
+        "unit": "h",
+        "hint": "Delay (hours) after startup before grid export is permitted.",
+    },
+    # Charge scheduling
+    106: {
+        "name": "charge_start_time",
+        "description": "Charge Start Hour",
+        "type": "number",
+        "unit": None,  # hour-of-day (0–23), not a duration
+        "hint": (
+            "Preferred hour of day (0–23) to start a scheduled charge. "
+            "For lithium batteries the inverter will schedule a bulk charge "
+            "to begin at this hour once the battery voltage drops below the "
+            "charge-enable threshold."
+        ),
+    },
+    # State-of-charge thresholds
+    153: {
+        "name": "li_charge_enable_soc",
+        "description": "Charge Enable SoC",
+        "type": "number",
+        "unit": "%",
+        "hint": (
+            "If battery SoC is below this level, charge-inhibit and "
+            "peak-load-shave limits are overridden and the inverter will "
+            "charge as fast as the source and BMS allow. "
+            "Also sets the 'Low Battery' threshold for relays and alarms."
+        ),
+    },
+    154: {
+        "name": "li_charge_disable_soc",
+        "description": "Charge Disable SoC",
+        "type": "number",
+        "unit": "%",
+        "hint": (
+            "If Partial Charge is on, the inverter stops charging once SoC "
+            "reaches this level (relying on solar or other chargers to top up). "
+            "If Charge Inhibit is on, the inverter limits import to the inhibit "
+            "power until this SoC is reached. "
+            "Also sets the 'Battery OK' threshold that releases low-battery relays."
+        ),
+    },
+    155: {
+        "name": "li_battery_empty_soc",
+        "description": "Battery Empty SoC",
+        "type": "number",
+        "unit": "%",
+        "hint": (
+            "If SoC stays below this level for more than 5 minutes in "
+            "stand-alone mode, the inverter enters Low Battery Mode and "
+            "shuts down its AC output. "
+            "Also sets the 'Critically Low Battery' threshold for relays and alarms."
+        ),
+    },
+    # Charge behaviour switches
+    159: {
+        "name": "partial_charge_enable",
+        "description": "Partial Charge Enable",
+        "type": "select",
+        "hint": (
+            "When enabled the inverter stops grid charging once battery SoC "
+            "reaches the Charge Disable SoC, leaving the remainder to solar "
+            "or other chargers."
+        ),
+    },
+    160: {
+        "name": "charge_inhibit_enable",
+        "description": "Charge Inhibit Enable",
+        "type": "select",
+        "hint": (
+            "When enabled the inverter limits its grid import so that source "
+            "power does not exceed the Charge Inhibit Power Limit. "
+            "The limit is ignored if battery SoC drops below Charge Enable SoC."
+        ),
+    },
+    161: {
+        "name": "charge_inhibit_limit",
+        "description": "Charge Inhibit Power Limit",
+        "type": "number",
+        "unit": "kW",
+        "hint": (
+            "Maximum power drawn from the grid while Charge Inhibit is active. "
+            "Ignored when battery SoC is below Charge Enable SoC."
+        ),
+    },
+    # Peak load shaving
+    162: {
+        "name": "peak_load_shave_enable",
+        "description": "Peak Load Shave Enable",
+        "type": "select",
+        "hint": (
+            "When enabled the inverter exports battery power to prevent "
+            "source power from exceeding the Peak Load Shave Power Limit."
+        ),
+    },
+    163: {
+        "name": "peak_load_shave_limit",
+        "description": "Peak Load Shave Power Limit",
+        "type": "number",
+        "unit": "kW",
+        "hint": (
+            "The inverter will discharge the battery to keep grid import "
+            "below this threshold when Peak Load Shave is enabled."
+        ),
+    },
+}
+
 # Energy sensors integrate the corresponding power sensor (power_idx) over time.
 # sign: "positive" = only count when power > 0, "negative" = only when power < 0, "all" = abs value.
 # Battery sign convention: positive = discharging, negative = charging.
@@ -7,13 +136,13 @@ ENERGY_SENSORS = [
     {
         "name": "grid_energy_consumed",
         "description": "Grid Energy Consumed",
-        "power_idx": 26,  # Src Pwr Total
+        "power_idx": 29,  # External CT Power — more accurate at meter point
         "sign": "positive",
     },
     {
         "name": "grid_energy_returned",
         "description": "Grid Energy Returned",
-        "power_idx": 26,
+        "power_idx": 29,
         "sign": "negative",
     },
     {
