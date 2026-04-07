@@ -1,5 +1,47 @@
 from homeassistant.components.sensor import SensorDeviceClass
 
+# Energy sensors integrate the corresponding power sensor (power_idx) over time.
+# sign: "positive" = only count when power > 0, "negative" = only when power < 0, "all" = abs value.
+# Battery sign convention: positive = discharging, negative = charging.
+ENERGY_SENSORS = [
+    {
+        "name": "grid_energy_consumed",
+        "description": "Grid Energy Consumed",
+        "power_idx": 26,  # Src Pwr Total
+        "sign": "positive",
+    },
+    {
+        "name": "grid_energy_returned",
+        "description": "Grid Energy Returned",
+        "power_idx": 26,
+        "sign": "negative",
+    },
+    {
+        "name": "solar_energy_produced",
+        "description": "Solar Energy Produced",
+        "power_idx": 88,  # Solar Chg Total Pwr
+        "sign": "all",
+    },
+    {
+        "name": "battery_energy_in",
+        "description": "Battery Energy In (Charging)",
+        "power_idx": 56,  # Battery Power — positive = discharging, negative = charging
+        "sign": "negative",
+    },
+    {
+        "name": "battery_energy_out",
+        "description": "Battery Energy Out (Discharging)",
+        "power_idx": 56,
+        "sign": "positive",
+    },
+    {
+        "name": "home_energy_consumed",
+        "description": "Home Energy Consumed",
+        "power_idx": 28,  # Load Pwr Total
+        "sign": "all",
+    },
+]
+
 SENSORS = {
     8: {
         "name": "system_op_mode",
