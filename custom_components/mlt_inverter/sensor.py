@@ -50,15 +50,20 @@ class MLTInverterSensor(CoordinatorEntity, SensorEntity):
         if "options" not in definition:
             self._attr_state_class = SensorStateClass.MEASUREMENT
 
-        # Determine unit of measurement from the value string if possible
+        # Determine unit of measurement from the value string if possible.
+        # The API uses 'C (apostrophe) for Celsius; map it to the HA standard °C.
+        _UNIT_MAP = {
+            "kW": "kW", "V": "V", "A": "A",
+            "Hz": "Hz", "kVA": "kVA", "kVAR": "kVAR",
+            "'C": "°C", "°C": "°C", "%": "%",
+        }
         if self._item.get("Value"):
             value = self._item["Value"]
             if isinstance(value, str):
-                # Extract unit from strings like "0.1kW", "236.7V", etc.
-                for unit in ["kW", "V", "A", "Hz", "kVA", "kVAR", "°C", "%"]:
-                    if value.endswith(unit):
-                        self._attr_native_unit_of_measurement = unit
-                        self._unit = unit
+                for raw_unit, ha_unit in _UNIT_MAP.items():
+                    if value.endswith(raw_unit):
+                        self._attr_native_unit_of_measurement = ha_unit
+                        self._unit = raw_unit  # keep raw for stripping in native_value
                         break
 
     @property
