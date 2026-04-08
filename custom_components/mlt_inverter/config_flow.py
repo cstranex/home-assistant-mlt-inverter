@@ -8,7 +8,14 @@ from homeassistant import config_entries
 from homeassistant.data_entry_flow import FlowResult
 from homeassistant.helpers.httpx_client import get_async_client
 
-from .const import CONF_HOST, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_HOST,
+    CONF_PASSCODE,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_PASSCODE,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 
 
 class MltInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
@@ -39,6 +46,7 @@ class MltInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             {
                 vol.Required(CONF_HOST): str,
                 vol.Optional(CONF_SCAN_INTERVAL, default=DEFAULT_SCAN_INTERVAL): int,
+                vol.Optional(CONF_PASSCODE, default=DEFAULT_PASSCODE): str,
             }
         )
 

@@ -11,7 +11,14 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.httpx_client import get_async_client
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import CONF_HOST, CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL, DOMAIN
+from .const import (
+    CONF_HOST,
+    CONF_PASSCODE,
+    CONF_SCAN_INTERVAL,
+    DEFAULT_PASSCODE,
+    DEFAULT_SCAN_INTERVAL,
+    DOMAIN,
+)
 
 _PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.NUMBER, Platform.SELECT]
 
@@ -22,11 +29,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up MLT Inverter from a config entry."""
     host = entry.data[CONF_HOST]
     scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    passcode = entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE)
 
     coordinator = InverterCoordinator(hass, host, scan_interval)
     await coordinator.async_config_entry_first_refresh()
 
-    settings_coordinator = SettingsCoordinator(hass, host, scan_interval)
+    settings_coordinator = SettingsCoordinator(hass, host, scan_interval, passcode)
     await settings_coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
@@ -47,8 +55,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 class SettingsCoordinator(DataUpdateCoordinator):
-    def __init__(self, hass: HomeAssistant, host: str, scan_interval: int) -> None:
+    def __init__(
+        self, hass: HomeAssistant, host: str, scan_interval: int, passcode: str
+    ) -> None:
         self.host = host
+        self.passcode = passcode
         super().__init__(
             hass,
             _LOGGER,
@@ -70,12 +81,17 @@ class SettingsCoordinator(DataUpdateCoordinator):
     async def async_write_setting(self, idx: int, value) -> None:
         """Write a setting via POST /WriteCals with body 'set,{idx},{value}'."""
         url = f"http://{self.host}:81/WriteCals"
+        client = get_async_client(self.hass)
         try:
-            client = get_async_client(self.hass)
-            response = await client.post(
-                url, content=f"set,{idx},{value}", timeout=30
-            )
-            response.raise_for_status()
+            for payload in (
+                f"ctrl,4,{self.passcode}",
+                "ctrl,5,1",
+                f"set,{idx},{value}",
+                f"ctrl,4,{self.passcode}",
+                "ctrl,5,0",
+            ):
+                response = await client.post(url, data=payload, timeout=30)
+                response.raise_for_status()
         except Exception as err:
             _LOGGER.error("Error writing setting %s=%s: %s", idx, value, err)
             raise
