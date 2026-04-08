@@ -131,7 +131,13 @@ SETTINGS = {
 
 # Energy sensors integrate the corresponding power sensor (power_idx) over time.
 # sign: "positive" = only count when power > 0, "negative" = only when power < 0, "all" = abs value.
-# Battery sign convention: positive = discharging, negative = charging.
+#
+# Battery topology: Solar Charger → DC Bus ← Battery Storage → Inverter → AC
+# idx 56 (Bat Power) = total DC drawn by the inverter = solar contribution + battery storage.
+# idx 88 (Solar Chg Pwr) = solar charger output into the DC bus.
+# Net battery storage = idx56 - idx88:  positive → discharging from storage,
+#                                        negative → net charging into storage.
+# subtract_idx: subtract this power index before applying sign/accumulation.
 ENERGY_SENSORS = [
     {
         "name": "grid_energy_consumed",
@@ -154,14 +160,16 @@ ENERGY_SENSORS = [
     {
         "name": "battery_energy_in",
         "description": "Battery Energy In (Charging)",
-        "power_idx": 56,  # Battery Power — positive = discharging, negative = charging
-        "sign": "negative",
+        "power_idx": 56,   # Bat Power (total DC inverter draw)
+        "subtract_idx": 88,  # minus solar → net battery storage flow
+        "sign": "negative",  # count when net is negative (storage charging)
     },
     {
         "name": "battery_energy_out",
         "description": "Battery Energy Out (Discharging)",
         "power_idx": 56,
-        "sign": "positive",
+        "subtract_idx": 88,
+        "sign": "positive",  # count when net is positive (storage discharging)
     },
     {
         "name": "home_energy_consumed",

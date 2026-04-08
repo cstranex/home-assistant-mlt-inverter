@@ -111,6 +111,7 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
     def __init__(self, coordinator, entry: ConfigEntry, definition: dict) -> None:
         super().__init__(coordinator)
         self._power_idx = definition["power_idx"]
+        self._subtract_idx = definition.get("subtract_idx")
         self._sign = definition["sign"]  # "positive", "negative", or "all"
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
@@ -128,16 +129,14 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
         # Reset the clock so the first coordinator tick doesn't count stale time.
         self._last_update = dt_util.utcnow()
 
-    def _get_power_kw(self) -> float | None:
-        """Extract the current power reading in kW from coordinator data."""
+    def _read_kw(self, idx: int) -> float | None:
+        """Read a kW value from coordinator data by index."""
         try:
-            item = self.coordinator.data[self._power_idx]
+            item = self.coordinator.data[idx]
         except (IndexError, TypeError):
             return None
-
         if not item or "Value" not in item or not item["Value"]:
             return None
-
         value = item["Value"]
         if isinstance(value, str) and "kW" in value:
             try:
@@ -145,6 +144,17 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
             except ValueError:
                 return None
         return None
+
+    def _get_power_kw(self) -> float | None:
+        """Return net power in kW, optionally subtracting a second index."""
+        power = self._read_kw(self._power_idx)
+        if power is None:
+            return None
+        if self._subtract_idx is not None:
+            subtract = self._read_kw(self._subtract_idx)
+            if subtract is not None:
+                power -= subtract
+        return power
 
     @callback
     def _handle_coordinator_update(self) -> None:
