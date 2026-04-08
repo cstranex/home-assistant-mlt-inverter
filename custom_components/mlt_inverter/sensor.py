@@ -8,7 +8,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
-from .mappings import ENERGY_SENSORS, SENSORS
+from .mappings import DERIVED_POWER_SENSORS, ENERGY_SENSORS, SENSORS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -29,6 +29,10 @@ async def async_setup_entry(
     for definition in ENERGY_SENSORS:
         if definition["power_idx"] < len(coordinator.data):
             sensors.append(MLTInverterEnergySensor(coordinator, entry, definition))
+
+    for definition in DERIVED_POWER_SENSORS:
+        if definition["power_idx"] < len(coordinator.data):
+            sensors.append(MLTInverterDerivedPowerSensor(coordinator, entry, definition))
 
     async_add_entities(sensors, True)
 
@@ -179,3 +183,57 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
     @property
     def native_value(self) -> float:
         return round(self._accumulated, 3)
+
+
+class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
+    """Instantaneous power sensor derived from one or two source sensors."""
+
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = "kW"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(self, coordinator, entry: ConfigEntry, definition: dict) -> None:
+        super().__init__(coordinator)
+        self._power_idx = definition["power_idx"]
+        self._subtract_idx = definition.get("subtract_idx")
+        self._mode = definition["mode"]
+        self._attr_name = definition["name"]
+        self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+
+    def _read_kw(self, idx: int) -> float | None:
+        """Read a kW value from coordinator data by index."""
+        try:
+            item = self.coordinator.data[idx]
+        except (IndexError, TypeError):
+            return None
+        if not item or "Value" not in item or not item["Value"]:
+            return None
+        value = item["Value"]
+        if isinstance(value, str) and "kW" in value:
+            try:
+                return float(value.replace("kW", ""))
+            except ValueError:
+                return None
+        return None
+
+    def _get_power_kw(self) -> float | None:
+        """Return signed net power in kW, optionally subtracting a second index."""
+        power = self._read_kw(self._power_idx)
+        if power is None:
+            return None
+        if self._subtract_idx is not None:
+            subtract = self._read_kw(self._subtract_idx)
+            if subtract is not None:
+                power -= subtract
+        return power
+
+    @property
+    def native_value(self) -> float | None:
+        power = self._get_power_kw()
+        if power is None:
+            return None
+        if self._mode == "positive":
+            return round(max(0.0, power), 3)
+        if self._mode == "negative":
+            return round(max(0.0, -power), 3)
+        return round(power, 3)

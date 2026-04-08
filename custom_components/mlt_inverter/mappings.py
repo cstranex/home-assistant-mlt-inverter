@@ -179,6 +179,23 @@ ENERGY_SENSORS = [
     },
 ]
 
+DERIVED_POWER_SENSORS = [
+    {
+        "name": "battery_charge_power",
+        "description": "Battery Charge Power",
+        "power_idx": 56,
+        "subtract_idx": 88,
+        "mode": "negative",
+    },
+    {
+        "name": "battery_discharge_power",
+        "description": "Battery Discharge Power",
+        "power_idx": 56,
+        "subtract_idx": 88,
+        "mode": "positive",
+    },
+]
+
 SENSORS = {
     8: {
         "name": "system_op_mode",
