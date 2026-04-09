@@ -66,7 +66,7 @@ class MltInverterOptionsFlow(config_entries.OptionsFlow):
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
         """Initialize options flow."""
-        self.config_entry = config_entry
+        self._config_entry = config_entry
 
     async def async_step_init(
         self, user_input: dict[str, Any] | None = None
@@ -79,24 +79,24 @@ class MltInverterOptionsFlow(config_entries.OptionsFlow):
             {
                 vol.Optional(
                     CONF_HOST,
-                    default=self.config_entry.options.get(
-                        CONF_HOST, self.config_entry.data[CONF_HOST]
+                    default=self._config_entry.options.get(
+                        CONF_HOST, self._config_entry.data[CONF_HOST]
                     ),
                 ): str,
                 vol.Optional(
                     CONF_SCAN_INTERVAL,
-                    default=self.config_entry.options.get(
+                    default=self._config_entry.options.get(
                         CONF_SCAN_INTERVAL,
-                        self.config_entry.data.get(
+                        self._config_entry.data.get(
                             CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
                         ),
                     ),
                 ): int,
                 vol.Optional(
                     CONF_PASSCODE,
-                    default=self.config_entry.options.get(
+                    default=self._config_entry.options.get(
                         CONF_PASSCODE,
-                        self.config_entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE),
+                        self._config_entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE),
                     ),
                 ): str,
             }
