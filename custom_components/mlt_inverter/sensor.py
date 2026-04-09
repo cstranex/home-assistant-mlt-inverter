@@ -27,14 +27,23 @@ async def async_setup_entry(
         sensors.append(MLTInverterSensor(coordinator, entry, idx, definition))
 
     for definition in ENERGY_SENSORS:
-        if definition["power_idx"] < len(coordinator.data):
+        if _definition_available(definition, coordinator.data):
             sensors.append(MLTInverterEnergySensor(coordinator, entry, definition))
 
     for definition in DERIVED_POWER_SENSORS:
-        if definition["power_idx"] < len(coordinator.data):
+        if _definition_available(definition, coordinator.data):
             sensors.append(MLTInverterDerivedPowerSensor(coordinator, entry, definition))
 
     async_add_entities(sensors, True)
+
+
+def _definition_available(definition: dict, data: list) -> bool:
+    """Return True if all indexes required by a derived definition are present."""
+    for key in ("power_idx", "subtract_idx", "voltage_idx", "current_idx"):
+        idx = definition.get(key)
+        if idx is not None and idx >= len(data):
+            return False
+    return True
 
 
 class MLTInverterSensor(CoordinatorEntity, SensorEntity):
@@ -114,8 +123,11 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
 
     def __init__(self, coordinator, entry: ConfigEntry, definition: dict) -> None:
         super().__init__(coordinator)
-        self._power_idx = definition["power_idx"]
+        self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._voltage_idx = definition.get("voltage_idx")
+        self._current_idx = definition.get("current_idx")
+        self._current_positive_is = definition.get("current_positive_is", "discharge")
         self._sign = definition["sign"]  # "positive", "negative", or "all"
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
@@ -149,8 +161,33 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
                 return None
         return None
 
+    def _read_number(self, idx: int, unit: str) -> float | None:
+        """Read a numeric value with a suffix such as V or A from coordinator data."""
+        try:
+            item = self.coordinator.data[idx]
+        except (IndexError, TypeError):
+            return None
+        if not item or "Value" not in item or not item["Value"]:
+            return None
+        value = item["Value"]
+        if isinstance(value, str) and unit in value:
+            try:
+                return float(value.replace(unit, ""))
+            except ValueError:
+                return None
+        return None
+
     def _get_power_kw(self) -> float | None:
-        """Return net power in kW, optionally subtracting a second index."""
+        """Return signed battery power in kW from either a direct power or V*A source."""
+        if self._voltage_idx is not None and self._current_idx is not None:
+            voltage = self._read_number(self._voltage_idx, "V")
+            current = self._read_number(self._current_idx, "A")
+            if voltage is None or current is None:
+                return None
+            power = (voltage * current) / 1000
+            # HA Energy expects positive discharge, negative charge.
+            return -power if self._current_positive_is == "charge" else power
+
         power = self._read_kw(self._power_idx)
         if power is None:
             return None
@@ -194,8 +231,11 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, entry: ConfigEntry, definition: dict) -> None:
         super().__init__(coordinator)
-        self._power_idx = definition["power_idx"]
+        self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._voltage_idx = definition.get("voltage_idx")
+        self._current_idx = definition.get("current_idx")
+        self._current_positive_is = definition.get("current_positive_is", "discharge")
         self._mode = definition["mode"]
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
@@ -216,8 +256,32 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
                 return None
         return None
 
+    def _read_number(self, idx: int, unit: str) -> float | None:
+        """Read a numeric value with a suffix such as V or A from coordinator data."""
+        try:
+            item = self.coordinator.data[idx]
+        except (IndexError, TypeError):
+            return None
+        if not item or "Value" not in item or not item["Value"]:
+            return None
+        value = item["Value"]
+        if isinstance(value, str) and unit in value:
+            try:
+                return float(value.replace(unit, ""))
+            except ValueError:
+                return None
+        return None
+
     def _get_power_kw(self) -> float | None:
-        """Return signed net power in kW, optionally subtracting a second index."""
+        """Return signed battery power in kW from either a direct power or V*A source."""
+        if self._voltage_idx is not None and self._current_idx is not None:
+            voltage = self._read_number(self._voltage_idx, "V")
+            current = self._read_number(self._current_idx, "A")
+            if voltage is None or current is None:
+                return None
+            power = (voltage * current) / 1000
+            return -power if self._current_positive_is == "charge" else power
+
         power = self._read_kw(self._power_idx)
         if power is None:
             return None

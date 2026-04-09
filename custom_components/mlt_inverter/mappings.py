@@ -129,15 +129,13 @@ SETTINGS = {
     },
 }
 
-# Energy sensors integrate the corresponding power sensor (power_idx) over time.
+# Energy sensors integrate the corresponding power source over time.
 # sign: "positive" = only count when power > 0, "negative" = only when power < 0, "all" = abs value.
 #
-# Battery topology: Solar Charger → DC Bus ← Battery Storage → Inverter → AC
-# idx 56 (Bat Power) = total DC drawn by the inverter = solar contribution + battery storage.
-# idx 88 (Solar Chg Pwr) = solar charger output into the DC bus.
-# Net battery storage = idx56 - idx88:  positive → discharging from storage,
-#                                        negative → net charging into storage.
-# subtract_idx: subtract this power index before applying sign/accumulation.
+# Battery energy is derived from the BMS-reported battery voltage/current rather
+# than dcBatP. The inverter's dcBatP does not consistently represent signed net
+# battery flow once solar is active on the DC bus, while BMS current does:
+# positive amps = charging, negative amps = discharging.
 ENERGY_SENSORS = [
     {
         "name": "grid_energy_consumed",
@@ -160,16 +158,18 @@ ENERGY_SENSORS = [
     {
         "name": "battery_energy_in",
         "description": "Battery Energy In (Charging)",
-        "power_idx": 56,   # Bat Power (total DC inverter draw)
-        "subtract_idx": 88,  # minus solar → net battery storage flow
-        "sign": "negative",  # count when net is negative (storage charging)
+        "voltage_idx": 141,  # BMS Bat Volts
+        "current_idx": 142,  # BMS Bat Amps
+        "current_positive_is": "charge",
+        "sign": "negative",  # signed battery power is negative while charging
     },
     {
         "name": "battery_energy_out",
         "description": "Battery Energy Out (Discharging)",
-        "power_idx": 56,
-        "subtract_idx": 88,
-        "sign": "positive",  # count when net is positive (storage discharging)
+        "voltage_idx": 141,
+        "current_idx": 142,
+        "current_positive_is": "charge",
+        "sign": "positive",  # signed battery power is positive while discharging
     },
     {
         "name": "home_energy_consumed",
@@ -183,16 +183,26 @@ DERIVED_POWER_SENSORS = [
     {
         "name": "battery_charge_power",
         "description": "Battery Charge Power",
-        "power_idx": 56,
-        "subtract_idx": 88,
+        "voltage_idx": 141,
+        "current_idx": 142,
+        "current_positive_is": "charge",
         "mode": "negative",
     },
     {
         "name": "battery_discharge_power",
         "description": "Battery Discharge Power",
-        "power_idx": 56,
-        "subtract_idx": 88,
+        "voltage_idx": 141,
+        "current_idx": 142,
+        "current_positive_is": "charge",
         "mode": "positive",
+    },
+    {
+        "name": "battery_net_power",
+        "description": "Battery Net Power",
+        "voltage_idx": 141,
+        "current_idx": 142,
+        "current_positive_is": "charge",
+        "mode": "signed",
     },
 ]
 
@@ -617,6 +627,16 @@ SENSORS = {
         "name": "battery_soc",
         "description": "Battery State of Charge",
         "type": SensorDeviceClass.BATTERY,
+    },
+    141: {
+        "name": "bms_battery_voltage",
+        "description": "BMS Battery Voltage",
+        "type": SensorDeviceClass.VOLTAGE,
+    },
+    142: {
+        "name": "bms_battery_current",
+        "description": "BMS Battery Current",
+        "type": SensorDeviceClass.CURRENT,
     },
     143: {
         "name": "battery_temperature",
