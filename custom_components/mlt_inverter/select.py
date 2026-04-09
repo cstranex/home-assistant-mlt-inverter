@@ -3,6 +3,7 @@ import logging
 from homeassistant.components.select import SelectEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -11,6 +12,16 @@ from .mappings import SETTINGS
 _LOGGER = logging.getLogger(__name__)
 
 _OPTIONS = ["No", "Yes"]
+
+
+def _device_info(entry: ConfigEntry) -> DeviceInfo:
+    """Return the shared device registry metadata for this inverter."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="MLT",
+        model="Inverter",
+    )
 
 
 async def async_setup_entry(
@@ -36,6 +47,7 @@ class MLTInverterSelect(CoordinatorEntity, SelectEntity):
         self.idx = idx
         self._attr_name = definition["description"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+        self._attr_device_info = _device_info(entry)
         self._hint = definition.get("hint")
 
     @property

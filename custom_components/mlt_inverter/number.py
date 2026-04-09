@@ -4,6 +4,7 @@ import re
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from .const import DOMAIN
@@ -38,6 +39,16 @@ def _parse_float(value) -> float | None:
     return None
 
 
+def _device_info(entry: ConfigEntry) -> DeviceInfo:
+    """Return the shared device registry metadata for this inverter."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="MLT",
+        model="Inverter",
+    )
+
+
 class MLTInverterNumber(CoordinatorEntity, NumberEntity):
     _attr_mode = NumberMode.BOX
 
@@ -48,6 +59,7 @@ class MLTInverterNumber(CoordinatorEntity, NumberEntity):
         self.idx = idx
         self._attr_name = definition["description"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+        self._attr_device_info = _device_info(entry)
         unit = definition.get("unit")
         self._attr_native_unit_of_measurement = unit if unit is not None else None
         self._hint = definition.get("hint")

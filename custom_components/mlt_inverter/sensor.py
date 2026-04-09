@@ -3,6 +3,7 @@ import logging
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.util import dt as dt_util
@@ -46,6 +47,16 @@ def _definition_available(definition: dict, data: list) -> bool:
     return True
 
 
+def _device_info(entry: ConfigEntry) -> DeviceInfo:
+    """Return the shared device registry metadata for this inverter."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, entry.entry_id)},
+        name=entry.title,
+        manufacturer="MLT",
+        model="Inverter",
+    )
+
+
 class MLTInverterSensor(CoordinatorEntity, SensorEntity):
     """Inverter Sensor"""
 
@@ -56,6 +67,7 @@ class MLTInverterSensor(CoordinatorEntity, SensorEntity):
         self._item = coordinator.data[idx]
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+        self._attr_device_info = _device_info(entry)
         self._unit = None
 
         self._attr_device_class = definition["type"]
@@ -131,6 +143,7 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
         self._sign = definition["sign"]  # "positive", "negative", or "all"
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+        self._attr_device_info = _device_info(entry)
         self._accumulated: float = 0.0
         self._last_update = dt_util.utcnow()
 
@@ -239,6 +252,7 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
         self._mode = definition["mode"]
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
+        self._attr_device_info = _device_info(entry)
 
     def _read_kw(self, idx: int) -> float | None:
         """Read a kW value from coordinator data by index."""
