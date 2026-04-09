@@ -21,6 +21,14 @@ from .const import (
 class MltInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
 
+    @staticmethod
+    @config_entries.callback
+    def async_get_options_flow(
+        config_entry: config_entries.ConfigEntry,
+    ) -> MltInverterOptionsFlow:
+        """Create the options flow."""
+        return MltInverterOptionsFlow(config_entry)
+
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
@@ -51,3 +59,47 @@ class MltInverterConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
         return self.async_show_form(step_id="user", data_schema=schema, errors=errors)
+
+
+class MltInverterOptionsFlow(config_entries.OptionsFlow):
+    """Handle MLT Inverter options."""
+
+    def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
+        """Initialize options flow."""
+        self.config_entry = config_entry
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Manage the integration options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        schema = vol.Schema(
+            {
+                vol.Optional(
+                    CONF_HOST,
+                    default=self.config_entry.options.get(
+                        CONF_HOST, self.config_entry.data[CONF_HOST]
+                    ),
+                ): str,
+                vol.Optional(
+                    CONF_SCAN_INTERVAL,
+                    default=self.config_entry.options.get(
+                        CONF_SCAN_INTERVAL,
+                        self.config_entry.data.get(
+                            CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL
+                        ),
+                    ),
+                ): int,
+                vol.Optional(
+                    CONF_PASSCODE,
+                    default=self.config_entry.options.get(
+                        CONF_PASSCODE,
+                        self.config_entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE),
+                    ),
+                ): str,
+            }
+        )
+
+        return self.async_show_form(step_id="init", data_schema=schema)

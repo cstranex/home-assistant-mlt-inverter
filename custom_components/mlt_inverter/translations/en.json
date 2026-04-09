@@ -16,5 +16,16 @@
                 }
             }
         }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "host": "Host",
+                    "scan_interval": "Scan Interval (seconds)",
+                    "passcode": "Passcode"
+                }
+            }
+        }
     }
 }

@@ -27,9 +27,13 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up MLT Inverter from a config entry."""
-    host = entry.data[CONF_HOST]
-    scan_interval = entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
-    passcode = entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE)
+    host = entry.options.get(CONF_HOST, entry.data[CONF_HOST])
+    scan_interval = entry.options.get(
+        CONF_SCAN_INTERVAL, entry.data.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+    )
+    passcode = entry.options.get(
+        CONF_PASSCODE, entry.data.get(CONF_PASSCODE, DEFAULT_PASSCODE)
+    )
 
     coordinator = InverterCoordinator(hass, host, scan_interval)
     await coordinator.async_config_entry_first_refresh()
@@ -39,6 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = coordinator
     hass.data[DOMAIN][f"{entry.entry_id}_settings"] = settings_coordinator
+    entry.async_on_unload(entry.add_update_listener(async_update_options))
 
     await hass.config_entries.async_forward_entry_setups(entry, _PLATFORMS)
 
@@ -52,6 +57,11 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.data[DOMAIN].pop(entry.entry_id, None)
         hass.data[DOMAIN].pop(f"{entry.entry_id}_settings", None)
     return unload_ok
+
+
+async def async_update_options(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload the integration when options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 class SettingsCoordinator(DataUpdateCoordinator):
