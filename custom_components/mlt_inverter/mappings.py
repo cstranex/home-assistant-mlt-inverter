@@ -152,12 +152,6 @@ ENERGY_SENSORS = [
     {
         "name": "solar_energy_produced",
         "description": "Solar Energy Produced",
-        "power_idx": 88,  # Solar Chg Total Pwr
-        "sign": "all",
-    },
-    {
-        "name": "solar_energy_balanced",
-        "description": "Solar Energy Balanced",
         "calculation": "solar_balance",
         "presence_idx": 88,  # Suppress AC/BMS metering noise when solar is idle
         "load_idx": 28,  # Load Power at the inverter load port
