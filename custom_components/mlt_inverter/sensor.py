@@ -43,6 +43,7 @@ def _definition_available(definition: dict, data: list) -> bool:
     for key in (
         "power_idx",
         "subtract_idx",
+        "presence_idx",
         "load_idx",
         "grid_idx",
         "voltage_idx",
@@ -144,6 +145,7 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
         super().__init__(coordinator)
         self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._presence_idx = definition.get("presence_idx")
         self._load_idx = definition.get("load_idx")
         self._grid_idx = definition.get("grid_idx")
         self._voltage_idx = definition.get("voltage_idx")
@@ -203,6 +205,11 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
     def _get_power_kw(self) -> float | None:
         """Return signed battery power in kW from either a direct power or V*A source."""
         if self._calculation == "solar_balance":
+            presence = self._read_kw(self._presence_idx)
+            if presence is None:
+                return None
+            if presence <= 0:
+                return 0.0
             load = self._read_kw(self._load_idx)
             grid = self._read_kw(self._grid_idx)
             voltage = self._read_number(self._voltage_idx, "V")
@@ -271,6 +278,7 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._presence_idx = definition.get("presence_idx")
         self._load_idx = definition.get("load_idx")
         self._grid_idx = definition.get("grid_idx")
         self._voltage_idx = definition.get("voltage_idx")
@@ -317,6 +325,11 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
     def _get_power_kw(self) -> float | None:
         """Return signed battery power in kW from either a direct power or V*A source."""
         if self._calculation == "solar_balance":
+            presence = self._read_kw(self._presence_idx)
+            if presence is None:
+                return None
+            if presence <= 0:
+                return 0.0
             load = self._read_kw(self._load_idx)
             grid = self._read_kw(self._grid_idx)
             voltage = self._read_number(self._voltage_idx, "V")

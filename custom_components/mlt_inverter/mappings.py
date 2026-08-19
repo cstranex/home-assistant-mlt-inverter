@@ -159,6 +159,7 @@ ENERGY_SENSORS = [
         "name": "solar_energy_balanced",
         "description": "Solar Energy Balanced",
         "calculation": "solar_balance",
+        "presence_idx": 88,  # Suppress AC/BMS metering noise when solar is idle
         "load_idx": 28,  # Load Power at the inverter load port
         "grid_idx": 26,  # Source Power at the inverter source port
         "voltage_idx": 141,  # BMS Bat Volts
@@ -195,6 +196,7 @@ DERIVED_POWER_SENSORS = [
         "name": "solar_power_balanced",
         "description": "Solar Power Balanced",
         "calculation": "solar_balance",
+        "presence_idx": 88,
         "load_idx": 28,
         "grid_idx": 26,
         "voltage_idx": 141,
