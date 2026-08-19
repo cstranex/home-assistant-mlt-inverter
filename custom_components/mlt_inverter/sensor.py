@@ -40,7 +40,14 @@ async def async_setup_entry(
 
 def _definition_available(definition: dict, data: list) -> bool:
     """Return True if all indexes required by a derived definition are present."""
-    for key in ("power_idx", "subtract_idx", "voltage_idx", "current_idx"):
+    for key in (
+        "power_idx",
+        "subtract_idx",
+        "load_idx",
+        "grid_idx",
+        "voltage_idx",
+        "current_idx",
+    ):
         idx = definition.get(key)
         if idx is not None and idx >= len(data):
             return False
@@ -137,9 +144,12 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
         super().__init__(coordinator)
         self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._load_idx = definition.get("load_idx")
+        self._grid_idx = definition.get("grid_idx")
         self._voltage_idx = definition.get("voltage_idx")
         self._current_idx = definition.get("current_idx")
         self._current_positive_is = definition.get("current_positive_is", "discharge")
+        self._calculation = definition.get("calculation")
         self._sign = definition["sign"]  # "positive", "negative", or "all"
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
@@ -192,6 +202,21 @@ class MLTInverterEnergySensor(CoordinatorEntity, SensorEntity, RestoreEntity):
 
     def _get_power_kw(self) -> float | None:
         """Return signed battery power in kW from either a direct power or V*A source."""
+        if self._calculation == "solar_balance":
+            load = self._read_kw(self._load_idx)
+            grid = self._read_kw(self._grid_idx)
+            voltage = self._read_number(self._voltage_idx, "V")
+            current = self._read_number(self._current_idx, "A")
+            if None in (load, grid, voltage, current):
+                return None
+            battery_power = (voltage * current) / 1000
+            battery_net = (
+                -battery_power
+                if self._current_positive_is == "charge"
+                else battery_power
+            )
+            return load - grid - battery_net
+
         if self._voltage_idx is not None and self._current_idx is not None:
             voltage = self._read_number(self._voltage_idx, "V")
             current = self._read_number(self._current_idx, "A")
@@ -246,9 +271,12 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
         super().__init__(coordinator)
         self._power_idx = definition.get("power_idx")
         self._subtract_idx = definition.get("subtract_idx")
+        self._load_idx = definition.get("load_idx")
+        self._grid_idx = definition.get("grid_idx")
         self._voltage_idx = definition.get("voltage_idx")
         self._current_idx = definition.get("current_idx")
         self._current_positive_is = definition.get("current_positive_is", "discharge")
+        self._calculation = definition.get("calculation")
         self._mode = definition["mode"]
         self._attr_name = definition["name"]
         self._attr_unique_id = f"mlt_inverter_{entry.entry_id}_{definition['name']}"
@@ -288,6 +316,21 @@ class MLTInverterDerivedPowerSensor(CoordinatorEntity, SensorEntity):
 
     def _get_power_kw(self) -> float | None:
         """Return signed battery power in kW from either a direct power or V*A source."""
+        if self._calculation == "solar_balance":
+            load = self._read_kw(self._load_idx)
+            grid = self._read_kw(self._grid_idx)
+            voltage = self._read_number(self._voltage_idx, "V")
+            current = self._read_number(self._current_idx, "A")
+            if None in (load, grid, voltage, current):
+                return None
+            battery_power = (voltage * current) / 1000
+            battery_net = (
+                -battery_power
+                if self._current_positive_is == "charge"
+                else battery_power
+            )
+            return load - grid - battery_net
+
         if self._voltage_idx is not None and self._current_idx is not None:
             voltage = self._read_number(self._voltage_idx, "V")
             current = self._read_number(self._current_idx, "A")
